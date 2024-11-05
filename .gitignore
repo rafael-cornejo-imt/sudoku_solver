@@ -396,3 +396,26 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Python bytecode files
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+venv/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Distribution / packaging
+*.egg-info/
+dist/
+build/
+
+# Environment variable files
+.env
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
