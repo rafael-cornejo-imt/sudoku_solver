@@ -1,76 +1,64 @@
-# image_processing/classes/GridDetector.py
-
+# Standard library imports
 import cv2
-import numpy as np
+
 
 class GridDetector:
-    def detect_grid(self, image, visualize=False):
-        # Convierte a escala de grises
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        # Aplica desenfoque Gaussiano para suavizar la imagen
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-        # Detección de bordes
-        edges = cv2.Canny(blurred, 50, 150)
-        # Encuentra contornos
-        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    """
+    Class for detecting and cropping the grid from a Sudoku image.
+    """
 
-        # Buscar el contorno más grande, presumiblemente la cuadrícula
-        sudoku_contour = max(contours, key=cv2.contourArea)
-        # Aproxima el contorno a una forma poligonal
-        epsilon = 0.1 * cv2.arcLength(sudoku_contour, True)
-        approx = cv2.approxPolyDP(sudoku_contour, epsilon, True)
+    def crop_image(self, image_path, coordinates, visualize=False):
+        """
+        Crops the specified region from the image, processes it, and
+        optionally visualizes the result.
 
-        if len(approx) == 4:
-            # Realiza la transformación de perspectiva
-            grid_image = self.four_point_transform(image, approx.reshape(4, 2))
+        Args:
+            image_path (str): Path to the input image.
+            coordinates (dict): Coordinates for cropping the image
+                                in the format {'x1': int, 'y1': int,
+                                'x2': int, 'y2': int}.
+            visualize (bool): If True, display the cropped and processed image.
 
-            # Mostrar la imagen de la cuadrícula detectada si se solicita
-            if visualize:
-                self.show_image(grid_image, "Detected Grid")
-            return grid_image
-        else:
-            raise ValueError("No Sudoku grid detected.")
+        Returns:
+            np.array: The processed binary image of the cropped grid.
+        """
+        # Read the original image
+        image = cv2.imread(image_path)
 
-    def four_point_transform(self, image, pts):
-        # Reordena los puntos para la transformación de perspectiva
-        rect = self.order_points(pts)
-        (tl, tr, br, bl) = rect
-        
-        # Calcula las dimensiones de la cuadrícula
-        widthA = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))
-        widthB = np.sqrt(((tr[0] - tl[0]) ** 2) + ((tr[1] - tl[1]) ** 2))
-        maxWidth = max(int(widthA), int(widthB))
+        # Crop the image using the specified coordinates
+        x1, y1, x2, y2 = (
+            coordinates["x1"],
+            coordinates["y1"],
+            coordinates["x2"],
+            coordinates["y2"],
+        )
+        cropped_image = image[y1:y2, x1:x2]
 
-        heightA = np.sqrt(((tr[0] - br[0]) ** 2) + ((tr[1] - br[1]) ** 2))
-        heightB = np.sqrt(((tl[0] - bl[0]) ** 2) + ((tl[1] - bl[1]) ** 2))
-        maxHeight = max(int(heightA), int(heightB))
+        # Convert the cropped image to grayscale
+        gray_cropped = cv2.cvtColor(cropped_image, cv2.COLOR_BGR2GRAY)
 
-        dst = np.array([
-            [0, 0],
-            [maxWidth - 1, 0],
-            [maxWidth - 1, maxHeight - 1],
-            [0, maxHeight - 1]], dtype="float32")
+        # Apply Gaussian blur to reduce noise
+        blurred_cropped = cv2.GaussianBlur(gray_cropped, (5, 5), 0)
 
-        M = cv2.getPerspectiveTransform(rect, dst)
-        warped = cv2.warpPerspective(image, M, (maxWidth, maxHeight))
+        # Binarization: keeping lighter colors
+        _, binary_cropped = cv2.threshold(
+            blurred_cropped, 55, 200, cv2.THRESH_BINARY_INV
+        )
 
-        return warped
+        # Show the detected grid image if visualization is requested
+        if visualize:
+            self.show_image(binary_cropped, "Detected Grid")
 
-    def order_points(self, pts):
-        # Ordena los puntos en el orden [top-left, top-right, bottom-right, bottom-left]
-        rect = np.zeros((4, 2), dtype="float32")
-        s = pts.sum(axis=1)
-        rect[0] = pts[np.argmin(s)]
-        rect[2] = pts[np.argmax(s)]
-
-        diff = np.diff(pts, axis=1)
-        rect[1] = pts[np.argmin(diff)]
-        rect[3] = pts[np.argmax(diff)]
-
-        return rect
+        return binary_cropped
 
     def show_image(self, image, title="Image"):
-        """Muestra la imagen en una ventana."""
+        """
+        Displays an image in a window.
+
+        Args:
+            image (np.array): The image to display.
+            title (str): The title of the display window.
+        """
         cv2.imshow(title, image)
-        cv2.waitKey(0)  # Espera hasta que se presione una tecla
-        cv2.destroyAllWindows()  # Cierra la ventana
+        cv2.waitKey(0)  # Wait until a key is pressed
+        cv2.destroyAllWindows()  # Close the display window
